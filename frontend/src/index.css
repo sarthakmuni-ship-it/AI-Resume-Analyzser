@@ -1,0 +1,4 @@
+﻿@import "tailwindcss";
+
+/* This tells Tailwind v4 to trigger dark mode when the .dark class is added to the HTML tag */
+@custom-variant dark (&:where(.dark, .dark *));
