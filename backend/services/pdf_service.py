@@ -1,23 +1,18 @@
 import fitz  # PyMuPDF
 
+
 async def extract_text_from_pdf(file_bytes: bytes) -> str:
     """
-    Extracts text from a PDF file provided as raw bytes.
+    Extract plain text from a PDF supplied as raw bytes.
+    Uses PyMuPDF (fitz) — no temp files needed.
     """
     try:
-        # Open the PDF directly from the memory stream (no need to save to disk first)
         doc = fitz.open(stream=file_bytes, filetype="pdf")
-        
-        extracted_text = ""
-        # Loop through every page and pull the text
+        pages = []
         for page_num in range(len(doc)):
             page = doc.load_page(page_num)
-            extracted_text += page.get_text("text") + "\n"
-            
+            pages.append(page.get_text("text"))
         doc.close()
-        
-        # Return the cleaned up text
-        return extracted_text.strip()
-        
+        return "\n".join(pages).strip()
     except Exception as e:
-        raise ValueError(f"Failed to extract text from PDF: {str(e)}")
+        raise ValueError(f"Failed to extract text from PDF: {e}")

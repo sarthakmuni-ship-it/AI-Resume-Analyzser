@@ -18,9 +18,12 @@ class AnalysisHistory(Base):
     
     # JSON columns allow us to store Python lists and dictionaries directly 
     # without needing extra tables for skills or feedback.
+    matched_skills = Column(JSON,)
     missing_skills = Column(JSON)
     ats_feedback = Column(JSON)
     rewritten_bullets = Column(JSON)
     
     # Automatically track when the analysis was performed
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+  
+
