@@ -1,15 +1,15 @@
-/**
- * normalizeAnalysis
- *
- * History items stored in the DB sometimes come back with array fields
- * serialized as JSON strings (e.g. matched_skills = '["Python","React"]')
- * instead of real arrays. This utility ensures every field is always the
- * correct JS type before any component tries to render it.
- *
- * Call this on every object before passing it to analysisData state:
- *   - fresh API response  → res.data.data
- *   - history item loaded → item from historyList
- */
+// /**
+//  * normalizeAnalysis
+//  *
+//  * History items stored in the DB sometimes come back with array fields
+//  * serialized as JSON strings (e.g. matched_skills = '["Python","React"]')
+//  * instead of real arrays. This utility ensures every field is always the
+//  * correct JS type before any component tries to render it.
+//  *
+//  * Call this on every object before passing it to analysisData state:
+//  *   - fresh API response  → res.data.data
+//  *   - history item loaded → item from historyList
+//  */
 export function normalizeAnalysis(data) {
   if (!data) return data;
 

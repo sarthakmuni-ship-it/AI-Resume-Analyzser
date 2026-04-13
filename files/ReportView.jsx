@@ -3,7 +3,6 @@ import ScoreRing from './ScoreRing';
 import Badge from './Badge';
 import SHead from './SHead';
 import BulletCard from './BulletCard';
-import { downloadPDFReport } from '../utils/exportPdf';  // ← NEW IMPORT
 
 function scoreColor(s) {
   if (s >= 80) return 'text-blue-600 dark:text-blue-400';
@@ -21,9 +20,8 @@ function scoreLabel(s) {
   return 'Needs work — key keywords are missing.';
 }
 
-export default function ReportView({ analysisData, pdfUrl }) {
+export default function ReportView({ analysisData, pdfUrl, onDownload }) {
   const [copiedIndex, setCopiedIndex] = useState(null);
-  const [exporting, setExporting]     = useState(false);  // ← loading state for export
 
   const copyToClipboard = (text, idx) => {
     navigator.clipboard.writeText(text);
@@ -31,23 +29,10 @@ export default function ReportView({ analysisData, pdfUrl }) {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  // ── PDF export handler ────────────────────────────────────────────────────
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      await downloadPDFReport(analysisData);
-    } catch (err) {
-      console.error('PDF export failed:', err);
-      alert('PDF export failed. Please try again.');
-    } finally {
-      setExporting(false);
-    }
-  };
-
   return (
     <div className={`grid grid-cols-1 ${pdfUrl ? 'lg:grid-cols-2 max-w-[1400px]' : 'max-w-4xl'} gap-6 h-[calc(100vh-110px)] mx-auto mt-2`}>
 
-      {/* PDF Preview — only shown when a file was uploaded (not when loading from history) */}
+      {/* PDF Preview — only if we have a URL */}
       {pdfUrl && (
         <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl rounded-3xl border border-white/60 dark:border-slate-700/50 shadow-sm flex flex-col overflow-hidden hidden lg:flex">
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
@@ -69,42 +54,20 @@ export default function ReportView({ analysisData, pdfUrl }) {
 
         {/* Panel Header */}
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 bg-white/50 dark:bg-slate-900/50 shrink-0 flex justify-between items-center z-10">
-          <span className="text-xs font-bold tracking-wide text-slate-800 dark:text-slate-200">
-            Analysis Report
-          </span>
-
-          {/* ── Export PDF Button (replaces the old text Export) ── */}
+          <span className="text-xs font-bold tracking-wide text-slate-800 dark:text-slate-200">Analysis Report</span>
           <button
-            onClick={handleExport}
-            disabled={exporting}
-            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+            onClick={onDownload}
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800 px-3 py-1.5 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
           >
-            {exporting ? (
-              <>
-                <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                </svg>
-                Generating…
-              </>
-            ) : (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Export PDF
-              </>
-            )}
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export
           </button>
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8
-          [&::-webkit-scrollbar]:w-1.5
-          [&::-webkit-scrollbar-track]:bg-transparent
-          [&::-webkit-scrollbar-thumb]:bg-slate-200
-          dark:[&::-webkit-scrollbar-thumb]:bg-slate-700
-          [&::-webkit-scrollbar-thumb]:rounded-full">
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-200 dark:[&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full">
 
           {/* Score Block */}
           <div className="flex items-center gap-6 p-6 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-700/50">
@@ -152,7 +115,7 @@ export default function ReportView({ analysisData, pdfUrl }) {
                 {analysisData.missing_skills?.length > 0
                   ? analysisData.missing_skills.map((item, i) => {
                       const name = typeof item === 'object' ? item.skill : item;
-                      const loc  = typeof item === 'object' ? item.recommended_location : 'Experience Section';
+                      const loc = typeof item === 'object' ? item.recommended_location : 'Experience Section';
                       return (
                         <div key={i} className="px-3 py-2.5 rounded-lg border border-rose-200/60 dark:border-rose-800/50 bg-rose-50 dark:bg-rose-900/10 flex flex-col gap-1 text-sm">
                           <span className="font-semibold text-rose-700 dark:text-rose-400">{name}</span>

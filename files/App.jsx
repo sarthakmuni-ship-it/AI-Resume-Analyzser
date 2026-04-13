@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
+import { normalizeAnalysis } from './utils/normalizeAnalysis';
 import Navbar from './components/Navbar';
 import Toast from './components/Toast';
 import UploadView from './components/UploadView';
-import ReportView from './components/ReportView';       // ← handles its own export now
+import ReportView from './components/ReportView';
 import HistoryView from './components/HistoryView';
 import ComparisonView from './components/ComparisonView';
 
@@ -42,7 +43,7 @@ export default function App() {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
-  /* ── Auto-dismiss success toast after 3s ── */
+  /* ── Auto-dismiss success toast ── */
   useEffect(() => {
     if (toast) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -53,14 +54,14 @@ export default function App() {
     }
   }, [toast]);
 
-  /* ── Cleanup pending request on unmount ── */
+  /* ── Cleanup on unmount ── */
   useEffect(() => {
     return () => { abortControllerRef.current?.abort(); };
   }, []);
 
-  /* ════════════════════════════════════════════
+  /* ════════════════════════════════════════════════════
      HANDLERS
-  ════════════════════════════════════════════ */
+  ════════════════════════════════════════════════════ */
 
   const handleAnalyze = async (e) => {
     e.preventDefault();
@@ -87,14 +88,14 @@ export default function App() {
       const res = await axios.post(`${API_URL}/`, fd, {
         signal: abortControllerRef.current.signal,
       });
-      setAnalysisData(res.data.data);
+      setAnalysisData(normalizeAnalysis(res.data.data));
       setToast({ message: 'Analysis completed successfully!', type: 'success' });
     } catch (err) {
       if (axios.isCancel(err)) {
-        console.log('Request cancelled by user.');
+        console.log('Analysis cleanly aborted by user.');
       } else {
         setToast({
-          message: err.response?.data?.detail || 'Analysis failed. Please check your server connection.',
+          message: err.response?.data?.detail || 'Analysis failed. Please check your connection to the server.',
           type: 'error',
         });
         setPdfUrl(null);
@@ -129,15 +130,15 @@ export default function App() {
       await axios.delete(`${API_URL}/history/${id}`);
       setHistoryList(prev => prev.filter(i => i.id !== id));
       setCompareList(prev => prev.filter(i => i.id !== id));
-      setToast({ message: 'Scan deleted.', type: 'success' });
+      setToast({ message: 'Scan deleted permanently.', type: 'success' });
     } catch {
       setToast({ message: 'Delete failed. Please try again.', type: 'error' });
     }
   };
 
   const loadHistoryItem = (item) => {
-    setAnalysisData(item);
-    setPdfUrl(null);         // no PDF preview for history items
+    setAnalysisData(normalizeAnalysis(item));
+    setPdfUrl(null);
     setShowHistory(false);
     setIsComparing(false);
     setToast(null);
@@ -146,6 +147,7 @@ export default function App() {
   const handleStartOver = () => {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
+
     setFile(null);
     setJobDescription('');
     setAnalysisData(null);
@@ -173,28 +175,72 @@ export default function App() {
       setCompareList([...compareList, item]);
       setToast(null);
     } else {
-      setToast({ message: 'You can only compare exactly 2 resumes.', type: 'error' });
+      setToast({ message: 'You can only select exactly 2 resumes to compare.', type: 'error' });
     }
   };
 
   const startComparison = () => {
     setCompareList([...compareList].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
     setIsComparing(true);
-    setToast({ message: 'Comparison ready!', type: 'success' });
+    setToast({ message: 'Comparison generated successfully!', type: 'success' });
   };
 
-  /* ════════════════════════════════════════════
+  const handleDownloadReport = () => {
+    if (!analysisData) return;
+
+    const reportContent = `RÉSUMÉ ATS AUDIT REPORT
+=======================
+Date Generated: ${new Date().toLocaleString()}
+Match Score: ${analysisData.match_score}% / 100
+
+MATCHED KEYWORDS
+----------------
+${analysisData.matched_skills?.length ? analysisData.matched_skills.join(', ') : 'None found'}
+
+MISSING KEYWORDS
+----------------
+${analysisData.missing_skills?.length
+  ? analysisData.missing_skills.map(s => {
+      const name = typeof s === 'object' ? s.skill : s;
+      const loc = typeof s === 'object' ? s.recommended_location : 'Experience Section';
+      return `- ${name} (Recommend adding to: ${loc})`;
+    }).join('\n')
+  : 'None missing! Your resume covers all key terms.'}
+
+EXPERT FEEDBACK
+---------------
+${analysisData.ats_feedback?.length ? analysisData.ats_feedback.map(f => `- ${f}`).join('\n') : 'No feedback provided.'}
+
+AI SUGGESTED REWRITES
+---------------------
+${analysisData.rewritten_bullets?.length
+  ? analysisData.rewritten_bullets.map((b, i) => `[Suggestion ${i + 1}]\nBefore: ${b.original}\nAfter:  ${b.rewritten}\n`).join('\n')
+  : 'No rewrites suggested.'}`;
+
+    const blob = new Blob([reportContent.trim()], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ATS_Report_${Date.now()}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  /* ════════════════════════════════════════════════════
      RENDER
-  ════════════════════════════════════════════ */
+  ════════════════════════════════════════════════════ */
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-blue-200 selection:text-blue-900 dark:selection:bg-blue-900/50 dark:selection:text-blue-100 relative">
 
-      {/* Background grid + radial gradient */}
+      {/* Background decorations */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-100/40 via-slate-50 to-slate-50 dark:from-blue-900/20 dark:via-slate-950 dark:to-slate-950" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px] dark:bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)]" />
       </div>
 
+      {/* Navbar */}
       <Navbar
         darkMode={darkMode}
         onToggleDark={() => setDarkMode(d => !d)}
@@ -202,7 +248,9 @@ export default function App() {
         onFetchHistory={fetchHistory}
       />
 
+      {/* Main */}
       <main className="pt-20 px-4 sm:px-6 pb-12 relative z-10">
+
         <Toast toast={toast} onDismiss={() => setToast(null)} />
 
         <div className="mt-4">
@@ -232,10 +280,10 @@ export default function App() {
               onJobDescChange={setJobDescription}
             />
           ) : (
-            // ↓ No onDownload prop needed — ReportView handles PDF export internally
             <ReportView
               analysisData={analysisData}
               pdfUrl={pdfUrl}
+              onDownload={handleDownloadReport}
             />
           )}
         </div>
